@@ -37,28 +37,29 @@
 (define-metafunction js
   norm-C : Cs -> Cs
   [(norm-C (C_1 ... ⊤ C_2 ...)) (norm-C (C_1 ... C_2 ...))]
-  [(norm-C (C_1 ... ⊤ C_2 ...)) bot]
+  [(norm-C (C_1 ... bot C_2 ...)) bot]
   [(norm-C Cs) Cs])
 
 ;; typing rules
 
 (define-metafunction js
+  fresh-ρ :  -> ρ
   [(fresh-ρ) ,(gensym 'ρ)])
 
 (define-metafunction js
-  fresh-var : any ... -> α
-  [(fresh-var any_1 ...) ,(gensym 'α) #;(variable-not-in (term (any_1 ...)) 'β)])
+  fresh-var :  -> α
+  [(fresh-var) ,(gensym 'α)])
 
 (define-judgment-form js
   #:mode (typ/e I I O O)
   #:contract (typ/e Γ e σ Cs)
   
-  [(where α (fresh-var Γ x))
+  [(where α (fresh-var))
    ---
    (typ/e Γ x α ((:= α (Γ x))))]
   
   [(typ/e Γ e σ (C ...))
-   (where α (fresh-var Γ e σ (C ...)))
+   (where α (fresh-var))
    ---
    (typ/e Γ (dot e x) α (norm-C (C ... (:= α (dot σ x)))))]
   
@@ -79,7 +80,7 @@
   #:mode (typ/m I I O O)
   #:contract (typ/m Γ m σ Cs)
   
-  [(where α (fresh-var Γ x))
+  [(where α (fresh-var))
    ---
    (typ/m Γ x α ((:= α (Γ x))))]
   
