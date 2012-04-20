@@ -140,6 +140,19 @@
    (typ/d Γ (import m x) (ρ *) (C ... (:= ρ (dot σ *))))]
   )
 
+(define-judgment-form js
+  #:mode (typ I O O)
+  #:contract (typ (module d ...) γ Cs)
+  
+  [(typ/m () (module d ...) γ Cs)
+   ---
+   (typ (module d ...) γ Cs)])
+
+(define-syntax-rule (gen d ...)
+  (judgment-holds (typ (module d ...) γ_1 Cs_1) (γ_1 Cs_1)))
+
+(gen (let x 1))
+
 
   
 
