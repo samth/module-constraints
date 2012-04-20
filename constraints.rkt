@@ -47,19 +47,19 @@
   [(fresh-ρ) ,(gensym 'ρ)])
 
 (define-metafunction js
-  fresh-var :  -> α
-  [(fresh-var) ,(gensym 'α)])
+  fresh-α :  -> α
+  [(fresh-α) ,(gensym 'α)])
 
 (define-judgment-form js
   #:mode (typ/e I I O O)
   #:contract (typ/e Γ e σ Cs)
   
-  [(where α (fresh-var))
+  [(where α (fresh-α))
    ---
    (typ/e Γ x α ((:= α (Γ x))))]
   
   [(typ/e Γ e σ (C ...))
-   (where α (fresh-var))
+   (where α (fresh-α))
    ---
    (typ/e Γ (dot e x) α (norm-C (C ... (:= α (dot σ x)))))]
   
@@ -80,18 +80,18 @@
   #:mode (typ/m I I O O)
   #:contract (typ/m Γ m σ Cs)
   
-  [(where α (fresh-var))
+  [(where α (fresh-α))
    ---
    (typ/m Γ x α ((:= α (Γ x))))]
   
   [(typ/m Γ m σ (C ...))
-   (where α (fresh-var))
+   (where α (fresh-α))
    (where ρ (fresh-ρ))
    ---
    (typ/m Γ (dot m x) α (norm-C (C ... (:= α (dot σ x)) (:= ρ (dot σ *)))))]
   
   [(where (γ_1 ...) Γ)
-   (where ρ_1 (fresh-var))
+   (where ρ_1 (fresh-α))
    (where ρ (fresh-ρ))
    (typ/d (γ_1 ... ρ) d γ_d (C ...)) ...   
    (where γ (⊔ γ_d ...))
@@ -125,12 +125,12 @@
    (typ/d Γ (let x e) (: x V) Cs)]
   
   [(typ/m Γ m σ (C ...))
-   (where α (fresh-var))
+   (where α (fresh-α))
    ---
    (typ/d Γ (mod x m) (: x α) (C ... (:= α σ)))]
   
   [(typ/m Γ m σ (C ...))
-   (where α (fresh-var))
+   (where α (fresh-α))
    (where ρ (fresh-ρ))
    ---
    (typ/d Γ (import m x) (: x α) (C ... (:= α (dot σ x)) (:= ρ (dot σ *))))]
