@@ -23,8 +23,7 @@
   [hσ σ (Γ x) (dot σ x)]
   [hγ γ (restrict γ export-ids) (⊔ γ ...) (dot σ *)]
   [C bot (:= α hσ) (:= ρ hγ)] ;; represent concatenation with Cs, ⊤ with ()
-  [Cs (C ...)]
-  
+  [Cs (C ...)]  
   [export-ids (x ...) *]
   )
 
@@ -163,10 +162,18 @@
 (gen (mod x (module (export X) (let X 1) (let Y 2)))     
      (import x *))
 
+(define-syntax-rule (constraints-of d ...)
+  (match-let ([(list (list sig con-set)) (judgment-holds (typ (module d ...) σ_1 Cs_1) (σ_1 Cs_1))])
+    con-set))
+
 ;; solving constraints
 
+(define-extended-language jsc js
+  [σ .... (module γ)]
+  [final-σ .... (module γ)])
+
 ;; constraints on signatures
-(define-metafunction js 
+(define-metafunction jsc
   solveA : (:= α hσ) -> (:= α hσ) or bot
   [(solveA (:= α ((γ ... (γ_1 ... (: x σ))) x)))
    (:= α σ)]
@@ -192,7 +199,7 @@
    bot]
   [(solveA C) C])
 
-(define-metafunction js
+(define-metafunction jsc
   names-of : (simple-γ ...) -> (x ...)
   [(names-of ((: x σ) γ ...))
    (x_1 ... x_2 ...)
@@ -208,7 +215,7 @@
    (where (x_1 ...) (names-of (γ ...)))]
   [(names-of ()) ()])
 
-(define-metafunction js
+(define-metafunction jsc
   plain-names-of : (simple-γ ...) -> (x ...)
   [(plain-names-of ((: x σ) γ ...))
    (x_1 ... x_2 ...)
@@ -221,7 +228,7 @@
    (where (x_1 ...) (plain-names-of (γ ...)))]  
   [(plain-names-of ()) ()])
 
-(define-metafunction js 
+(define-metafunction jsc 
   solveR : (:= ρ hγ) -> (:= ρ hγ) or bot  
   [(solveR (:= ρ (γ_1 ... ρ γ_2 ...)))
    bot]
@@ -270,7 +277,7 @@
                                      (term x))))]
   [(solveR C) C])
 
-(define-metafunction js
+(define-metafunction jsc
   substA : α any any -> any
   [(substA α any_r (:= any_1 any_2))
    (:= any_1 (substA α any_r any_2))]
@@ -278,7 +285,7 @@
   [(substA α any_1 (any_2 ...)) ((substA α any_1 any_2) ...)]
   [(substA α any_1 any_2) any_2])
 
-(define-metafunction js
+(define-metafunction jsc
   substR : ρ any any -> any
   [(substR ρ any_r (:= any_1 any_2))
    (:= any_1 (substR ρ any_r any_2))]
@@ -288,7 +295,7 @@
 
 (define solver
   (reduction-relation 
-   js
+   jsc
    #:domain Cs
    [--> (C_0 ... bot C_1 ....) (bot) bot]
    [--> (C_0 ... (:= α hσ) C_1 ...)
@@ -324,3 +331,37 @@
 (define (go cs)
   (traces solver cs))
 
+(define d 
+  '((:= (R ρ1456) (⊔ () (: X V) (: Y V)))
+    (:= (R ρ1457) (restrict (R ρ1456) (X)))
+    (:= (A α1459) (module (R ρ1457)))
+    (:= (A α1460) (((R ρ1453)) x))
+    (:= (R ρ1461) (dot (A α1460) *))
+    (:= (R ρ1453) (⊔ (: x (A α1459)) ((R ρ1461) *)))
+    (:= (R ρ1454) (restrict (R ρ1453) ()))))
+
+
+(go (constraints-of (mod x (module (export X) (let X 1) (let Y 2)))     
+                    (import x *)))
+
+(define fail '((:=
+                (R ρ29966)
+                ((: X V) (: Y V)))
+               (:= (R ρ29967) ((: X V)))
+               (:=
+                (A α29969)
+                (module ((: X V))))
+               (:=
+                (A α29970)
+                (((R ρ29963)) x))
+               (:=
+                (R ρ29971)
+                (dot (A α29970) *))
+               (:=
+                (R ρ29963)
+                (⊔
+                 (: x (module ((: X V))))
+                 ((R ρ29971) *)))
+               (:=
+                (R ρ29964)
+                (restrict (R ρ29963) ()))))
