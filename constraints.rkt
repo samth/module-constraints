@@ -1,6 +1,7 @@
 #lang racket
 (require redex/reduction-semantics)
 
+(caching-enabled? #f)
 
 (define-language js
   ;; section 1 of andreas' pdf
@@ -12,8 +13,10 @@
   [program (d ...)]
   ;; section 2
   [σ α V (module ρ)]
+  [final-σ V (module ρ)]
   [α (A variable-not-otherwise-mentioned)]
   [ρ (R variable-not-otherwise-mentioned)]
+  [final-γ simple-γ (simple-γ ...)]
   [γ ρ (: x σ) (γ ...) (γ *)] ;; multisequences to avoid associativity, · with ()
   [simple-γ (: x σ) ((: x σ) *)]
   [Γ (γ ...)]
@@ -170,7 +173,7 @@
   [(solveA (:= α ((γ ... (((: x σ) *))) x)))
    (:= α σ)]
   [(solveA (:= α ((γ ... (γ_1 ... ((: x σ_1) *) ((: x σ) *))) x)))
-   bot] ;; could allow this 
+   bot] ;; could allow this if σ = σ_1
   [(solveA (:= α ((γ ... (γ_1 ... (: x_1 σ))) x)))
    (:= α ((γ ... (γ_1 ...)) x))
    (side-condition (not (equal? (term x) (term x_1))))]
@@ -234,20 +237,24 @@
                           (apply set (term (names-of (simple-γ ...))))))]
   [(solveR (:= ρ (restrict (simple-γ ...) (x ...))))
    bot
-   (side-condition (proper-subset? (apply set (term (x ...)))
-                                   (apply set (term (names-of (simple-γ ...))))))]
-  [(solveR (:= ρ (restrict ((: x σ) γ ...) (x_1 ...))))
-   (:= ρ (restrict (γ ...) (x_1 ...)))
+   (side-condition (proper-subset? (apply set (term (names-of (simple-γ ...))))
+                                   (apply set (term (x ...)))))]
+  [(solveR (:= ρ (restrict (γ_1 ... (: x σ) γ ...) (x_1 ...))))
+   (:= ρ (restrict (γ_1 ... γ ...) (x_1 ...)))
    (side-condition (not (set-member? (apply set (term (x_1 ...)))
                                      (term x))))]
-  [(solveR (:= ρ (restrict (((: x σ) *) γ ...) (x_1 ...))))
-   (:= ρ (restrict (γ ...) (x_1 ...)))
+  [(solveR (:= ρ (restrict (γ_1 ... ((: x σ) *) γ ...) (x_1 ...))))
+   (:= ρ (restrict (γ_1 ... γ ...) (x_1 ...)))
    (side-condition (not (set-member? (apply set (term (x_1 ...)))
                                      (term x))))]
   [(solveR (:= ρ (⊔ γ)))
    (:= ρ γ)]
   [(solveR (:= ρ (⊔ γ_1 ... () γ_2 ...)))
    (:= ρ (⊔ γ_1 ... γ_2 ...))]
+  
+  [(solveR (:= ρ (⊔ simple-γ_1 ...)))
+   (:= ρ (simple-γ_1 ...))]
+  
   [(solveR (:= ρ (⊔ ((: x σ_1) γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...)))
    bot]
   [(solveR (:= ρ (⊔ (((: x σ_1) *) γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...)))
@@ -268,34 +275,52 @@
   [(substA α any_r (:= any_1 any_2))
    (:= any_1 (substA α any_r any_2))]
   [(substA α any_1 α) any_1]
-  [(substA α any_1 (any_2 ...)) ((substA α any_1 any_2) ...)])
+  [(substA α any_1 (any_2 ...)) ((substA α any_1 any_2) ...)]
+  [(substA α any_1 any_2) any_2])
 
 (define-metafunction js
   substR : ρ any any -> any
   [(substR ρ any_r (:= any_1 any_2))
    (:= any_1 (substR ρ any_r any_2))]
   [(substR ρ any_1 ρ) any_1]
-  [(substR ρ any_1 (any_2 ...)) ((substR ρ any_1 any_2) ...)])
+  [(substR ρ any_1 (any_2 ...)) ((substR ρ any_1 any_2) ...)]
+  [(substR ρ any_1 any_2) any_2])
 
 (define solver
   (reduction-relation 
    js
    #:domain Cs
-   [--> (C_0 ... bot C_1 ....) (bot)]
+   [--> (C_0 ... bot C_1 ....) (bot) bot]
    [--> (C_0 ... (:= α hσ) C_1 ...)
         (C_0 ... C C_1 ...)
         (where C (solveA (:= α hσ)))
-        (side-condition (not (equal? (term (:= α hσ)) (term C))))]
+        (where (A x) α)
+        (side-condition (not (equal? (term (:= α hσ)) (term C))))
+        (computed-name (format "solveA ~a" (term x)))]
    [--> (C_0 ... (:= ρ hγ) C_1 ...)
         (C_0 ... C C_1 ...)
+        (where (R x) ρ)
         (where C (solveR (:= ρ hγ)))
-        (side-condition (not (equal? (term (:= ρ hγ)) (term C))))]
-   [--> (C_0 ... (:= ρ γ) C_1 ...)
-        (C_2 ... (:= ρ γ) C_3 ...)
-        (where (C_2 ...) (substR ρ γ (C_0 ...)))
-        (where (C_3 ...) (substR ρ γ (C_1 ...)))]
-   [--> (C_0 ... (:= α σ) C_1 ...)
-        (C_2 ... (:= α σ) C_3 ...)
-        (where (C_2 ...) (substA α σ (C_0 ...)))
-        (where (C_3 ...) (substA α σ (C_1 ...)))]))
+        (side-condition (not (equal? (term (:= ρ hγ)) (term C))))
+        (computed-name (format "solveR ~a" (term x)))]
+   [--> (C_0 ... (:= ρ final-γ) C_1 ...)
+        (C_2 ... (:= ρ final-γ) C_3 ...)
+        (where (R x) ρ)
+        (where (C_2 ...) (substR ρ final-γ (C_0 ...)))
+        (where (C_3 ...) (substR ρ final-γ (C_1 ...)))
+        (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
+        (computed-name (format "substR ~a" (term x)))]
+   [--> (C_0 ... (:= α final-σ) C_1 ...)
+        (C_2 ... (:= α final-σ) C_3 ...)
+        (where (A x) α)
+        (where (C_2 ...) (substA α final-σ (C_0 ...)))
+        (where (C_3 ...) (substA α final-σ (C_1 ...)))
+        (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
+        (computed-name (format "substA ~a" (term x)))]))
+
+(require unstable/lazy-require)
+(lazy-require [redex (traces)])
+
+(define (go cs)
+  (traces solver cs))
 
