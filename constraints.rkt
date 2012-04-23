@@ -18,7 +18,7 @@
   [Γ (γ ...)]
   [hσ σ (Γ x) (dot σ x)]
   [hγ γ (restrict γ export-ids) (⊔ γ ...) (dot σ *)]
-  [C ⊤ bot (:= α hσ) (:= ρ hγ)] ;; represent concatenation with Cs
+  [C bot (:= α hσ) (:= ρ hγ)] ;; represent concatenation with Cs, ⊤ with ()
   [Cs (C ...)]
   
   [export-ids (x ...) *]
@@ -35,8 +35,7 @@
   [(norm-γ γ) γ])
 
 (define-metafunction js
-  norm-C : Cs -> Cs
-  [(norm-C (C_1 ... ⊤ C_2 ...)) (norm-C (C_1 ... C_2 ...))]
+  norm-C : Cs -> Cs  
   [(norm-C (C_1 ... bot C_2 ...)) bot]
   [(norm-C Cs) Cs])
 
@@ -63,7 +62,7 @@
    ---
    (typ/e Γ (dot e x) α (norm-C (C ... (:= α (dot σ x)))))]
   
-  [(typ/e Γ n V (⊤))]
+  [(typ/e Γ n V ())]
   
   [(typ/e Γ e_1 σ_1 (C_1 ...)) 
    (typ/e Γ e_2 σ_2 (C_2 ...))
@@ -90,13 +89,14 @@
    ---
    (typ/m Γ (dot m x) α (norm-C (C ... (:= α (dot σ x)) (:= ρ (dot σ *)))))]
   
-  [(where (γ_1 ...) Γ)
-   (where ρ_1 (fresh-α))
-   (where ρ (fresh-ρ))
-   (typ/d (γ_1 ... ρ) d γ_d (C ...)) ...   
-   (where γ (⊔ γ_d ...))
+  [(where ρ   (fresh-ρ))
+   (where ρ_1 (fresh-ρ))
+   (where ρ_2 (fresh-ρ))
+   (typ/d (γ_1 ... ρ) d γ_d (C_1 ...)) ...
+   (where (C_new ...) (C_1 ... ...  (:= ρ (⊔ γ_d ...)) (:= ρ_1 (restrict ρ (exports d ...)))))
+   ;(where γ )
    ---
-   (typ/m Γ (module d ...) (module ρ_1) (C ... ... (:= ρ γ) (:= ρ_1 (restrict γ (exports d ...)))))])
+   (typ/m (γ_1 ...) (module d ...) (module ρ_1) (C_new ...))])
 
 (define-metafunction js
   exports : d ... -> export-ids
@@ -117,8 +117,8 @@
   #:mode (typ/d I I O O)
   #:contract (typ/d Γ d γ Cs)
   
-  [(typ/d Γ (export x) · (⊤))]
-  [(typ/d Γ (export *) · (⊤))]
+  [(typ/d Γ (export x) · ())]
+  [(typ/d Γ (export *) · ())]
   
   [(typ/e Γ e σ Cs)
    ---
@@ -143,14 +143,14 @@
 
 (define-judgment-form js
   #:mode (typ I O O)
-  #:contract (typ (module d ...) γ Cs)
+  #:contract (typ (module d ...) σ Cs)
   
-  [(typ/m () (module d ...) γ Cs)
+  [(typ/m () (module d ...) σ Cs)
    ---
-   (typ (module d ...) γ Cs)])
+   (typ (module d ...) σ Cs)])
 
 (define-syntax-rule (gen d ...)
-  (judgment-holds (typ (module d ...) γ_1 Cs_1) (γ_1 Cs_1)))
+  (judgment-holds (typ (module d ...) σ_1 Cs_1) (σ_1 Cs_1)))
 
 (gen (let x 1))
 
