@@ -12,8 +12,8 @@
   [program (d ...)]
   ;; section 2
   [σ α V (module ρ)]
-  [α variable-not-otherwise-mentioned]
-  [ρ variable-not-otherwise-mentioned]
+  [α (A variable-not-otherwise-mentioned)]
+  [ρ (R variable-not-otherwise-mentioned)]
   [γ ρ (: x σ) · (γ γ ...) (γ *)] ;; multisequences to avoid associativity
   [Γ (γ ...)]
   [hσ σ (Γ x) (dot σ x)]
@@ -43,11 +43,11 @@
 
 (define-metafunction js
   fresh-ρ :  -> ρ
-  [(fresh-ρ) ,(gensym 'ρ)])
+  [(fresh-ρ) (R ,(gensym 'ρ))])
 
 (define-metafunction js
   fresh-α :  -> α
-  [(fresh-α) ,(gensym 'α)])
+  [(fresh-α) (A ,(gensym 'α))])
 
 (define-judgment-form js
   #:mode (typ/e I I O O)
@@ -138,7 +138,7 @@
   [(typ/m Γ m σ (C ...))   
    (where ρ (fresh-ρ))
    ---
-   (typ/d Γ (import m x) (ρ *) (C ... (:= ρ (dot σ *))))]
+   (typ/d Γ (import m *) (ρ *) (C ... (:= ρ (dot σ *))))]
   )
 
 (define-judgment-form js
@@ -154,8 +154,14 @@
 
 (gen (let x 1))
 
+(gen (import x *))
 
-  
+(gen (mod x (module (export X) (let X 1) (let Y 2)))     
+     (import x *))
+
+;; solving constraints
+
+
 
 
 
