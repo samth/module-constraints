@@ -14,7 +14,8 @@
   [σ α V (module ρ)]
   [α (A variable-not-otherwise-mentioned)]
   [ρ (R variable-not-otherwise-mentioned)]
-  [γ ρ (: x σ) · (γ γ ...) (γ *)] ;; multisequences to avoid associativity
+  [γ ρ (: x σ) (γ ...) (γ *)] ;; multisequences to avoid associativity, · with ()
+  [simple-γ (: x σ) ((: x σ) *)]
   [Γ (γ ...)]
   [hσ σ (Γ x) (dot σ x)]
   [hγ γ (restrict γ export-ids) (⊔ γ ...) (dot σ *)]
@@ -27,7 +28,7 @@
 ;; implicit equivalences
 (define-metafunction js
   norm-γ : γ -> γ
-  [(norm-γ (γ_1 ... · γ_2 ...)) (norm-γ (γ_1 ... γ_2 ...))]
+  [(norm-γ (γ_1 ... γ_2 ...)) (norm-γ (γ_1 ... γ_2 ...))]
   [(norm-γ ((γ ...) *)) (norm-γ ((γ *) ...))]
   [(norm-γ ((γ *) *)) (norm-γ (γ *))]
   [(norm-γ (γ ...)) ((norm-γ γ) ...)]
@@ -117,8 +118,8 @@
   #:mode (typ/d I I O O)
   #:contract (typ/d Γ d γ Cs)
   
-  [(typ/d Γ (export x) · ())]
-  [(typ/d Γ (export *) · ())]
+  [(typ/d Γ (export x) () ())]
+  [(typ/d Γ (export *) () ())]
   
   [(typ/e Γ e σ Cs)
    ---
@@ -183,5 +184,80 @@
   [(solveA (:= α (dot (module ρ) x)))
    (:= α ((ρ) x))]
   [(solveA (:= α (dot V x)))
-   (:= α V)])
+   (:= α V)]
+  [(solveA (:= α α))
+   bot])
+
+(define-metafunction js
+  names-of : (simple-γ ...) -> (x ...)
+  [(names-of ((: x σ) γ ...))
+   (x_1 ... x_2 ...)
+   (where (x_1 ... x x_2 ...) (names-of (γ ...)))]
+  [(names-of (((: x σ) *) γ ...))
+   (x_1 ... x_2 ...)
+   (where (x_1 ... x x_2 ...) (names-of (γ ...)))]
+  [(names-of ((: x σ) γ ...))
+   (x x_1 ...)
+   (where (x_1 ...) (names-of (γ ...)))]
+  [(names-of (((: x σ) *) γ ...))
+   (x x_1 ...)
+   (where (x_1 ...) (names-of (γ ...)))]
+  [(names-of ()) ()])
+
+(define-metafunction js
+  plain-names-of : (simple-γ ...) -> (x ...)
+  [(plain-names-of ((: x σ) γ ...))
+   (x_1 ... x_2 ...)
+   (where (x_1 ... x x_2 ...) (plain-names-of (γ ...)))]
+  [(plain-names-of (((: x σ) *) γ ...))
+   (x_1 ...)
+   (where (x_1 ...) (plain-names-of (γ ...)))]
+  [(plain-names-of ((: x σ) γ ...))
+   (x x_1 ...)
+   (where (x_1 ...) (plain-names-of (γ ...)))]  
+  [(plain-names-of ()) ()])
+
+(define-metafunction js 
+  solveR : (:= ρ hγ) -> (:= ρ hγ) or bot  
+  [(solveR (:= ρ (γ_1 ... ρ γ_2 ...)))
+   bot]
+  [(solveR (:= ρ (dot (module ρ_1) *)))
+   (:= ρ ρ_1)]
+  [(solveR (:= ρ (dot V *)))
+   bot]
+  [(solveR (:= ρ (restrict γ *)))
+   (:= ρ γ)]
+  [(solveR (:= ρ (restrict (simple-γ ...) (x ...))))
+   (:= ρ (simple-γ ...))
+   (side-condition (set=? (apply set (term (x ...)))
+                          (apply set (term (names-of (simple-γ ...))))))]
+  [(solveR (:= ρ (restrict (simple-γ ...) (x ...))))
+   bot
+   (side-condition (proper-subset? (apply set (term (x ...)))
+                                   (apply set (term (names-of (simple-γ ...))))))]
+  [(solveR (:= ρ (restrict ((: x σ) γ ...) (x_1 ...))))
+   (:= ρ (restrict (γ ...) (x_1 ...)))
+   (side-condition (not (set-member? (apply set (term (x_1 ...)))
+                                     (term x))))]
+  [(solveR (:= ρ (restrict (((: x σ) *) γ ...) (x_1 ...))))
+   (:= ρ (restrict (γ ...) (x_1 ...)))
+   (side-condition (not (set-member? (apply set (term (x_1 ...)))
+                                     (term x))))]
+  [(solveR (:= ρ (⊔ γ)))
+   (:= ρ γ)]
+  [(solveR (:= ρ (⊔ γ_1 ... () γ_2 ...)))
+   (:= ρ (⊔ γ_1 ... γ_2 ...))]
+  [(solveR (:= ρ (⊔ ((: x σ_1) γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...)))
+   bot]
+  [(solveR (:= ρ (⊔ (((: x σ_1) *) γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...)))
+   (:= ρ (⊔ (γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...))]
+  
+  [(solveR (:= ρ (⊔ ((: x σ_1) γ_1 ...) (simple-γ_2 ...) γ_3 ...)))
+   (:= ρ (⊔ (γ_1 ...) ((: x σ_1) simple-γ_2 ...) γ_3 ...))
+   (side-condition (not (set-member? (apply set (term (names-of (simple-γ_2 ...))))
+                                     (term x))))]
+  [(solveR (:= ρ (⊔ (((: x σ_1) *) γ_1 ...) (simple-γ_2 ...) γ_3 ...)))
+   (:= ρ (⊔ (γ_1 ...) (((: x σ_1) *) simple-γ_2 ...) γ_3 ...))
+   (side-condition (not (set-member? (apply set (term (plain-names-of (simple-γ_2 ...))))
+                                     (term x))))])
 
