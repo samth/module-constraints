@@ -186,7 +186,8 @@
   [(solveA (:= α (dot V x)))
    (:= α V)]
   [(solveA (:= α α))
-   bot])
+   bot]
+  [(solveA C) C])
 
 (define-metafunction js
   names-of : (simple-γ ...) -> (x ...)
@@ -259,5 +260,42 @@
   [(solveR (:= ρ (⊔ (((: x σ_1) *) γ_1 ...) (simple-γ_2 ...) γ_3 ...)))
    (:= ρ (⊔ (γ_1 ...) (((: x σ_1) *) simple-γ_2 ...) γ_3 ...))
    (side-condition (not (set-member? (apply set (term (plain-names-of (simple-γ_2 ...))))
-                                     (term x))))])
+                                     (term x))))]
+  [(solveR C) C])
+
+(define-metafunction js
+  substA : α any any -> any
+  [(substA α any_r (:= any_1 any_2))
+   (:= any_1 (substA α any_r any_2))]
+  [(substA α any_1 α) any_1]
+  [(substA α any_1 (any_2 ...)) ((substA α any_1 any_2) ...)])
+
+(define-metafunction js
+  substR : ρ any any -> any
+  [(substR ρ any_r (:= any_1 any_2))
+   (:= any_1 (substR ρ any_r any_2))]
+  [(substR ρ any_1 ρ) any_1]
+  [(substR ρ any_1 (any_2 ...)) ((substR ρ any_1 any_2) ...)])
+
+(define solver
+  (reduction-relation 
+   js
+   #:domain Cs
+   [--> (C_0 ... bot C_1 ....) (bot)]
+   [--> (C_0 ... (:= α hσ) C_1 ...)
+        (C_0 ... C C_1 ...)
+        (where C (solveA (:= α hσ)))
+        (side-condition (not (equal? (term (:= α hσ)) (term C))))]
+   [--> (C_0 ... (:= ρ hγ) C_1 ...)
+        (C_0 ... C C_1 ...)
+        (where C (solveR (:= ρ hγ)))
+        (side-condition (not (equal? (term (:= ρ hγ)) (term C))))]
+   [--> (C_0 ... (:= ρ γ) C_1 ...)
+        (C_2 ... (:= ρ γ) C_3 ...)
+        (where (C_2 ...) (substR ρ γ (C_0 ...)))
+        (where (C_3 ...) (substR ρ γ (C_1 ...)))]
+   [--> (C_0 ... (:= α σ) C_1 ...)
+        (C_2 ... (:= α σ) C_3 ...)
+        (where (C_2 ...) (substA α σ (C_0 ...)))
+        (where (C_3 ...) (substA α σ (C_1 ...)))]))
 
