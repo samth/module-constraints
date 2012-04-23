@@ -161,11 +161,27 @@
 
 ;; solving constraints
 
-
-
-
-
-
-
-
+;; constraints on signatures
+(define-metafunction js 
+  solveA : (:= α hσ) -> (:= α hσ) or bot
+  [(solveA (:= α ((γ ... (γ_1 ... (: x σ))) x)))
+   (:= α σ)]
+  [(solveA (:= α ((γ ... (((: x σ) *))) x)))
+   (:= α σ)]
+  [(solveA (:= α ((γ ... (γ_1 ... ((: x σ_1) *) ((: x σ) *))) x)))
+   bot] ;; could allow this 
+  [(solveA (:= α ((γ ... (γ_1 ... (: x_1 σ))) x)))
+   (:= α ((γ ... (γ_1 ...)) x))
+   (side-condition (not (equal? (term x) (term x_1))))]
+  [(solveA (:= α ((γ ... (γ_1 ... ((: x_1 σ) *))) x))) 
+   (:= α ((γ ... (γ_1 ...)) x))
+   (side-condition (not (equal? (term x) (term x_1))))]
+  [(solveA (:= α ((γ ... ()) x))) 
+   (:= α ((γ ...) x))]
+  [(solveA (:= α (() x))) 
+   bot]
+  [(solveA (:= α (dot (module ρ) x)))
+   (:= α ((ρ) x))]
+  [(solveA (:= α (dot V x)))
+   (:= α V)])
 
