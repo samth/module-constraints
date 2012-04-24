@@ -34,7 +34,15 @@
   [export-ids (x ...) *]
   )
 
-(define-metafunction js
+
+;; extend the language to support solving constraints
+
+(define-extended-language jsc js
+  [σ .... (module γ)]
+  [hσ .... (check Γ x) (check* Γ x)]
+  [final-σ .... (module γ)])
+
+(define-metafunction jsc
   flatten : pre-γ -> γ
   [(flatten simple-γ) (simple-γ)]
   [(flatten (pre-γ ...))
@@ -44,7 +52,7 @@
    ((add-* simple-γ) ...)
    (where (simple-γ ...) (flatten pre-γ))])
 
-(define-metafunction js
+(define-metafunction jsc
   add-* : simple-γ -> simple-γ
   [(add-* (simple-γ *)) (simple-γ *)]
   [(add-* simple-γ) (simple-γ *)])
@@ -77,7 +85,7 @@
   fresh-α :  -> α
   [(fresh-α) (A ,(gensym 'α))])
 
-(define-judgment-form js
+(define-judgment-form jsc
   #:mode (typ/e I I O O)
   #:contract (typ/e Γ e σ Cs)
   
@@ -104,7 +112,7 @@
 (judgment-holds (typ/e () (+ y (dot z w)) σ_1 Cs_1) (σ_1 Cs_1))
 
 
-(define-metafunction js
+(define-metafunction jsc
   ⊔ : γ ... -> γ
   [(⊔ γ ...) (flatten (γ ...))])
 
@@ -194,13 +202,6 @@
   (match-let ([(list (list sig con-set)) (judgment-holds (typ (module d ...) σ_1 Cs_1) (σ_1 Cs_1))])
     con-set))
 
-;; solving constraints
-
-(define-extended-language jsc js
-  [σ .... (module γ)]
-  [hσ .... (check Γ x) (check* Γ x)]
-  [final-σ .... (module γ)])
-
 ;; constraints on signatures
 (define-metafunction jsc
   solveA : (:= α hσ) -> (C ...)
@@ -276,31 +277,31 @@
 
 (define-metafunction jsc
   names-of : (base-γ ...) -> (x ...)
-  [(names-of ((: x σ) γ ...))
+  [(names-of ((: x σ) base-γ ...))
    (x_1 ... x_2 ...)
-   (where (x_1 ... x x_2 ...) (names-of (γ ...)))]
-  [(names-of (((: x σ) *) γ ...))
+   (where (x_1 ... x x_2 ...) (names-of (base-γ ...)))]
+  [(names-of (((: x σ) *) base-γ ...))
    (x_1 ... x_2 ...)
-   (where (x_1 ... x x_2 ...) (names-of (γ ...)))]
-  [(names-of ((: x σ) γ ...))
+   (where (x_1 ... x x_2 ...) (names-of (base-γ ...)))]
+  [(names-of ((: x σ) base-γ ...))
    (x x_1 ...)
-   (where (x_1 ...) (names-of (γ ...)))]
-  [(names-of (((: x σ) *) γ ...))
+   (where (x_1 ...) (names-of (base-γ ...)))]
+  [(names-of (((: x σ) *) base-γ ...))
    (x x_1 ...)
-   (where (x_1 ...) (names-of (γ ...)))]
+   (where (x_1 ...) (names-of (base-γ ...)))]
   [(names-of ()) ()])
 
 (define-metafunction jsc
-  plain-names-of : (simple-γ ...) -> (x ...)
-  [(plain-names-of ((: x σ) γ ...))
+  plain-names-of : (base-γ ...) -> (x ...)
+  [(plain-names-of ((: x σ) base-γ ...))
    (x_1 ... x_2 ...)
-   (where (x_1 ... x x_2 ...) (plain-names-of (γ ...)))]
-  [(plain-names-of (((: x σ) *) γ ...))
+   (where (x_1 ... x x_2 ...) (plain-names-of (base-γ ...)))]
+  [(plain-names-of (((: x σ) *) base-γ ...))
    (x_1 ...)
-   (where (x_1 ...) (plain-names-of (γ ...)))]
-  [(plain-names-of ((: x σ) γ ...))
+   (where (x_1 ...) (plain-names-of (base-γ ...)))]
+  [(plain-names-of ((: x σ) base-γ ...))
    (x x_1 ...)
-   (where (x_1 ...) (plain-names-of (γ ...)))]  
+   (where (x_1 ...) (plain-names-of (base-γ ...)))]  
   [(plain-names-of ()) ()])
 
 (define-metafunction jsc 
@@ -378,9 +379,9 @@
    (:= any_1 (substR ρ any_r any_2))]
   [(substR ρ any_1 ρ) any_1]
   
-  ;; have to call join here to re-normalize
+  ;; have to call flatten here to re-normalize
   [(substR ρ any_1 (simple-γ ...))
-   (⊔ (substR ρ any_1 simple-γ) ...)]
+   (flatten ((substR ρ any_1 simple-γ) ...))]
   
   [(substR ρ any_1 (any_2 ...)) ((substR ρ any_1 any_2) ...)]
   [(substR ρ any_1 any_2) any_2])
@@ -394,7 +395,7 @@
    
    ;; simplify a signature constraint
    [--> (C_0 ... (:= α hσ) C_1 ...)
-        (C_0 ... (C ...) C_1 ...)
+        (C_0 ... C ... C_1 ...)
         (where (C ...) (solveA (:= α hσ)))
         (where (A x) α)
         (side-condition (not (equal? (term ((:= α hσ))) (term (C ...)))))
@@ -402,10 +403,10 @@
    
    ;; simplify a row constraint
    [--> (C_0 ... (:= ρ hγ) C_1 ...)
-        (C_0 ... C ... C_1 ...)
+        (C_0 ... C C_1 ...)
         (where (R x) ρ)
-        (where (C ...) (solveR (:= ρ hγ)))
-        (side-condition (not (equal? (term ((:= ρ hγ))) (term (C ...)))))
+        (where C (solveR (:= ρ hγ)))
+        (side-condition (not (equal? (term (:= ρ hγ)) (term C))))
         (computed-name (format "solveR ~a" (term x)))]
    
    ;; substitute a row
@@ -415,18 +416,18 @@
         (where (C_2 ...) (substR ρ γ (C_0 ...)))
         (where (C_3 ...) (substR ρ γ (C_1 ...)))
         ;; only do this if we can't simplify first
-        (side-condition (not (equal? (term ((:= ρ hγ))) (term (solveR (:= ρ hγ))))))
+        (side-condition (equal? (term (:= ρ γ)) (term (solveR (:= ρ γ)))))
         ;; don't substitute if it doesn't make progress
         (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
         (computed-name (format "substR ~a" (term x)))]
    ;; substitute a signature
-   [--> (C_0 ... (:= α σ) C_1 ...)
-        (C_2 ... (:= α σ) C_3 ...)
+   [--> (C_0 ... (:= α final-σ) C_1 ...)
+        (C_2 ... (:= α final-σ) C_3 ...)
         (where (A x) α)
-        (where (C_2 ...) (substA α σ (C_0 ...)))
-        (where (C_3 ...) (substA α σ (C_1 ...)))
+        (where (C_2 ...) (substA α final-σ (C_0 ...)))
+        (where (C_3 ...) (substA α final-σ (C_1 ...)))
         ;; only do this if we can't simplify first
-        (side-condition (not (equal? (term ((:= α σ))) (term (solveA (:= α σ))))))
+        (side-condition (equal? (term ((:= α final-σ))) (term (solveA (:= α final-σ)))))
         ;; don't substitute if it doesn't make progress
         (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
         (computed-name (format "substA ~a" (term x)))]))
