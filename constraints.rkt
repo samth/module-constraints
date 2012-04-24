@@ -40,7 +40,8 @@
 (define-extended-language jsc js
   [σ .... (module γ)]
   [hσ .... (check Γ x) (check* Γ x)]
-  [final-σ .... (module γ)])
+  [final-σ .... (module γ)]
+  [simple-C (:= α final-σ) (:= ρ γ)])
 
 (define-metafunction jsc
   flatten : pre-γ -> γ
@@ -386,51 +387,65 @@
   [(substR ρ any_1 (any_2 ...)) ((substR ρ any_1 any_2) ...)]
   [(substR ρ any_1 any_2) any_2])
 
+(define-metafunction jsc
+  subst : simple-C any -> any
+  [(subst (:= α final-σ) any)
+   (substA α final-σ any)]
+  [(subst (:= ρ γ) any)
+   (substR ρ γ any)])
+
+(define-metafunction jsc
+  solve : C -> (C ...)
+  [(solve (:= α hσ)) (solveA (:= α hσ))]
+  [(solve (:= ρ hγ)) [(solveR (:= ρ hγ))]])
+
+(define-metafunction jsc
+  cname : C -> x
+  [(cname (:= (A x) hσ)) x]
+  [(cname (:= (R x) hγ)) x])
+
+(define-metafunction jsc
+  solvable? : C -> any
+  [(solvable? C) ,(not (equal? (term (C)) (term (solve C))))])
+
+(define-metafunction jsc
+  substable? : C (C ...) -> any
+  [(substable? simple-C (C ...))
+   ,(not (equal? (term (C ...))
+                 (term (subst simple-C (C ...)))))]
+  [(substable? C any) false])
+
 (define solver
   (reduction-relation 
    jsc
-   #:domain Cs
+   #:domain (C ...)
    ;; fail
    [--> (C_0 ... ⊥ C_1 ....) (⊥) ⊥]
    
    ;; simplify a signature constraint
-   [--> (C_0 ... (:= α hσ) C_1 ...)
+   [--> (C_0 ... C_s C_1 ...)
         (C_0 ... C ... C_1 ...)
-        (where (C ...) (solveA (:= α hσ)))
-        (where (A x) α)
-        (side-condition (not (equal? (term ((:= α hσ))) (term (C ...)))))
-        (computed-name (format "solveA ~a" (term x)))]
+        (where (C ...) (solve C_s))        
+        (side-condition (not (equal? (term (C_s)) (term (C ...)))))
+        (side-condition (not (ormap (λ (e) (term (solvable? ,e)))
+                                    (term (C_0 ...)))))
+        (computed-name (format "solve ~a" (term (cname C_s))))]   
    
-   ;; simplify a row constraint
-   [--> (C_0 ... (:= ρ hγ) C_1 ...)
-        (C_0 ... C C_1 ...)
-        (where (R x) ρ)
-        (where C (solveR (:= ρ hγ)))
-        (side-condition (not (equal? (term (:= ρ hγ)) (term C))))
-        (computed-name (format "solveR ~a" (term x)))]
-   
-   ;; substitute a row
-   [--> (C_0 ... (:= ρ γ) C_1 ...)
-        (C_2 ... (:= ρ γ) C_3 ...)
-        (where (R x) ρ)
-        (where (C_2 ...) (substR ρ γ (C_0 ...)))
-        (where (C_3 ...) (substR ρ γ (C_1 ...)))
-        ;; only do this if we can't simplify first
-        (side-condition (equal? (term (:= ρ γ)) (term (solveR (:= ρ γ)))))
+   ;; substitute
+   [--> (C_0 ... simple-C C_1 ...)
+        (C_2 ... simple-C C_3 ...)        
+        (where (C_2 ...) (subst simple-C (C_0 ...)))
+        (where (C_3 ...) (subst simple-C (C_1 ...)))                
+        ;; only do this if we can't simplify something first
+        (side-condition (not (ormap (λ (e) (term (solvable? ,e)))
+                                    (term (C_0 ... simple-C C_1 ...)))))
+        ;; make sure nothing else earlier is substable
+        #;
+        (side-condition (not (ormap (λ (e) (term (substable? ,e (C_0 ... C_1 ...))))
+                                    (term (C_0 ...)))))
         ;; don't substitute if it doesn't make progress
         (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
-        (computed-name (format "substR ~a" (term x)))]
-   ;; substitute a signature
-   [--> (C_0 ... (:= α final-σ) C_1 ...)
-        (C_2 ... (:= α final-σ) C_3 ...)
-        (where (A x) α)
-        (where (C_2 ...) (substA α final-σ (C_0 ...)))
-        (where (C_3 ...) (substA α final-σ (C_1 ...)))
-        ;; only do this if we can't simplify first
-        (side-condition (equal? (term ((:= α final-σ))) (term (solveA (:= α final-σ)))))
-        ;; don't substitute if it doesn't make progress
-        (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
-        (computed-name (format "substA ~a" (term x)))]))
+        (computed-name (format "subst ~a" (term simple-C)))]))
 
 (require unstable/lazy-require)
 (lazy-require [redex (traces)])
