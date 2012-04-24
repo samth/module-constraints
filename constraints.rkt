@@ -377,6 +377,7 @@
    (:= any_1 (substR ρ any_r any_2))]
   [(substR ρ any_1 ρ) any_1]
   
+  ;; have to call join here to re-normalize
   [(substR ρ any_1 (simple-γ ...))
    (⊔ (substR ρ any_1 simple-γ) ...)]
   
@@ -387,31 +388,45 @@
   (reduction-relation 
    jsc
    #:domain Cs
+   ;; fail
    [--> (C_0 ... ⊥ C_1 ....) (⊥) ⊥]
+   
+   ;; simplify a signature constraint
    [--> (C_0 ... (:= α hσ) C_1 ...)
-        (C_0 ... C C_1 ...)
-        (where C (solveA (:= α hσ)))
+        (C_0 ... (C ...) C_1 ...)
+        (where (C ...) (solveA (:= α hσ)))
         (where (A x) α)
-        (side-condition (not (equal? (term (:= α hσ)) (term C))))
+        (side-condition (not (equal? (term ((:= α hσ))) (term (C ...)))))
         (computed-name (format "solveA ~a" (term x)))]
+   
+   ;; simplify a row constraint
    [--> (C_0 ... (:= ρ hγ) C_1 ...)
-        (C_0 ... C C_1 ...)
+        (C_0 ... C ... C_1 ...)
         (where (R x) ρ)
-        (where C (solveR (:= ρ hγ)))
-        (side-condition (not (equal? (term (:= ρ hγ)) (term C))))
+        (where (C ...) (solveR (:= ρ hγ)))
+        (side-condition (not (equal? (term ((:= ρ hγ))) (term (C ...)))))
         (computed-name (format "solveR ~a" (term x)))]
-   [--> (C_0 ... (:= ρ final-γ) C_1 ...)
-        (C_2 ... (:= ρ final-γ) C_3 ...)
+   
+   ;; substitute a row
+   [--> (C_0 ... (:= ρ γ) C_1 ...)
+        (C_2 ... (:= ρ γ) C_3 ...)
         (where (R x) ρ)
-        (where (C_2 ...) (substR ρ final-γ (C_0 ...)))
-        (where (C_3 ...) (substR ρ final-γ (C_1 ...)))
+        (where (C_2 ...) (substR ρ γ (C_0 ...)))
+        (where (C_3 ...) (substR ρ γ (C_1 ...)))
+        ;; only do this if we can't simplify first
+        (side-condition (not (equal? (term ((:= ρ hγ))) (term (solveR (:= ρ hγ))))))
+        ;; don't substitute if it doesn't make progress
         (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
         (computed-name (format "substR ~a" (term x)))]
-   [--> (C_0 ... (:= α final-σ) C_1 ...)
-        (C_2 ... (:= α final-σ) C_3 ...)
+   ;; substitute a signature
+   [--> (C_0 ... (:= α σ) C_1 ...)
+        (C_2 ... (:= α σ) C_3 ...)
         (where (A x) α)
-        (where (C_2 ...) (substA α final-σ (C_0 ...)))
-        (where (C_3 ...) (substA α final-σ (C_1 ...)))
+        (where (C_2 ...) (substA α σ (C_0 ...)))
+        (where (C_3 ...) (substA α σ (C_1 ...)))
+        ;; only do this if we can't simplify first
+        (side-condition (not (equal? (term ((:= α σ))) (term (solveA (:= α σ))))))
+        ;; don't substitute if it doesn't make progress
         (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
         (computed-name (format "substA ~a" (term x)))]))
 
