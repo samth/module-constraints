@@ -18,13 +18,15 @@
   [σ α V (module ρ)]
   [final-σ V (module ρ)]
   
-  [γ (simple-γ ...)] ;; multisequences to avoid associativity, · with ()
-  [simple-γ (: x σ) ((: x σ) *) ρ (ρ *)]
   [pre-γ γ simple-γ (pre-γ *) (pre-γ ...)] ;; normalized to γ
+  
+  [γ (simple-γ ...)] ;; multisequences to avoid associativity, · with ()
+  [simple-γ base-γ ρ (ρ *)]
+  [base-γ (: x σ) ((: x σ) *)]  
   
   [Γ (γ ...)]
   
-  [hσ σ (Γ x) (dot σ x)]
+  [hσ σ (select Γ x) (dot σ x)]
   [hγ γ (restrict γ export-ids) (dot σ *)]
   [C ⊥ (:= α hσ) (:= ρ hγ)] ;; represent concatenation with Cs, ⊤ with ()
   [Cs (C ...)]  
@@ -111,7 +113,7 @@
   
   [(where α (fresh-α))
    ---
-   (typ/m Γ x α ((:= α (Γ x))))]
+   (typ/m Γ x α ((:= α (select Γ x))))]
   
   [(typ/m Γ m σ (C ...))
    (where α (fresh-α))
@@ -195,34 +197,80 @@
 
 (define-extended-language jsc js
   [σ .... (module γ)]
+  [hσ .... (check Γ x) (check* Γ x)]
   [final-σ .... (module γ)])
 
 ;; constraints on signatures
 (define-metafunction jsc
-  solveA : (:= α hσ) -> (:= α hσ) or ⊥
-  [(solveA (:= α ((γ ... (γ_1 ... (: x σ))) x)))
-   (:= α σ)]
-  [(solveA (:= α ((γ ... (((: x σ) *))) x)))
-   (:= α σ)]
-  [(solveA (:= α ((γ ... (γ_1 ... ((: x σ_1) *) ((: x σ) *))) x)))
-   ⊥] ;; could allow this if σ = σ_1
-  [(solveA (:= α ((γ ... (γ_1 ... (: x_1 σ))) x)))
-   (:= α ((γ ... (γ_1 ...)) x))
-   (side-condition (not (equal? (term x) (term x_1))))]
-  [(solveA (:= α ((γ ... (γ_1 ... ((: x_1 σ) *))) x))) 
-   (:= α ((γ ... (γ_1 ...)) x))
-   (side-condition (not (equal? (term x) (term x_1))))]
-  [(solveA (:= α ((γ ... ()) x))) 
-   (:= α ((γ ...) x))]
+  solveA : (:= α hσ) -> (C ...)
+  ;; failure -- duplicate binding for x
+  ;; NOTE -- could succeed here if σ_1 = σ_2
+  [(solveA (:= α (select (γ ... (simple-γ_1 ... (: x σ_1) simple-γ_2 ... (: x σ_2) simple-γ_3 ...)) x)))
+   (⊥)]
+  ;; succeed with no unresolved rows, don't need a check
+  ;; NOTE -- this case is an optimization of the next case
+  [(solveA (:= α (select (γ ... (base-γ_1 ... (: x σ) base-γ_2 ...)) x)))
+   ((:= α σ))]
+  ;; possibly-unresolved rows, add a check
+  [(solveA (:= α (select (γ ... (simple-γ_1 ... (: x σ) simple-γ_2 ...)) x)))
+   ((:= α σ)
+    (:= α (check (γ ... (simple-γ_1 ... (: x σ) simple-γ_2 ...)) x)))]
+  
+  ;; done with this and it failed
+  [(solveA (:= α (check (γ ... (simple-γ_1 ... (: x σ_1) simple-γ_2 ... (: x σ) simple-γ_3 ...)) x)))
+   (⊥)]
+  ;; done with this and it succeeded
+  [(solveA (:= α (check (γ ... (base-γ_1 ... (: x σ) base-γ_2 ...)) x)))
+   ()]
+  
+  ;; stars
+  
+  ;; failure -- duplicate binding for x
+  ;; NOTE -- could succeed here if σ_1 = σ_2
+  [(solveA (:= α (select (γ ... (simple-γ_1 ... ((: x σ_1) *) simple-γ_2 ... ((: x σ_2) *) simple-γ_3 ...)) x)))
+   (⊥)]
+  ;; succeed with no unresolved rows, don't need a check
+  [(solveA (:= α (select (γ ... (base-γ_1 ... ((: x σ) *) base-γ_2 ...)) x)))
+   ((:= α σ))]
+  ;; possibly-unresolved rows, add a check
+  [(solveA (:= α (select (γ ... (simple-γ_1 ... ((: x σ) *) simple-γ_2 ...)) x)))
+   ((:= α σ)
+    (:= α (check* (γ ... (simple-γ_1 ... ((: x σ) *) simple-γ_2 ...)) x)))]
+  
+  ;; done with this and it failed b/c of duplicate *
+  [(solveA (:= α (check* (γ ... (simple-γ_1 ... ((: x σ_1) *) simple-γ_2 ... ((: x σ) *) simple-γ_3 ...)) x)))
+   (⊥)]
+  ;; done with this and it failed b/c of later addition of non-* binding for x
+  [(solveA (:= α (check* (γ ... (simple-γ_1 ... (: x σ_1) base-γ_2 ...)) x)))
+   (⊥)]
+  ;; done with this and it succeeded
+  [(solveA (:= α (check* (γ ... (base-γ_1 ... ((: x σ) *) base-γ_2 ...)) x)))
+   ()]
+  
+  ;; all concrete bindings, none of them match `x', search upward
+  ;; FIXME -- is this rule right?  do we need to search upwards even if we haven't fully resolved?
+  ;; I don't see how it could be right to do that
+  [(solveA (:= α ((γ ... (base-γ ...)) x))) 
+   ((:= α ((γ ...) x)))]
+  
+  ;; empty env, fail
   [(solveA (:= α (() x))) 
-   ⊥]
+   (⊥)]
+  
+  ;; selection out of a module just selects out the relevant row
   [(solveA (:= α (dot (module ρ) x)))
-   (:= α ((ρ) x))]
+   ((:= α (select [ρ] x)))]
+  
+  ;; property access on objects is dynamic
   [(solveA (:= α (dot V x)))
-   (:= α V)]
+   ((:= α V))]
+  
+  ;; trivial recursive constraints are illegal
   [(solveA (:= α α))
-   ⊥]
-  [(solveA C) C])
+   (⊥)]
+  
+  ;; otherwise, do nothing
+  [(solveA C) (C)])
 
 (define-metafunction jsc
   names-of : (simple-γ ...) -> (x ...)
