@@ -270,10 +270,11 @@
    (⊥)]
   
   ;; otherwise, do nothing
-  [(solveA C) (C)])
+  [(solveA C)
+   (C)])
 
 (define-metafunction jsc
-  names-of : (simple-γ ...) -> (x ...)
+  names-of : (base-γ ...) -> (x ...)
   [(names-of ((: x σ) γ ...))
    (x_1 ... x_2 ...)
    (where (x_1 ... x x_2 ...) (names-of (γ ...)))]
@@ -302,52 +303,63 @@
   [(plain-names-of ()) ()])
 
 (define-metafunction jsc 
-  solveR : (:= ρ hγ) -> (:= ρ hγ) or ⊥  
-  [(solveR (:= ρ (γ_1 ... ρ γ_2 ...)))
+  solveR : (:= ρ hγ) -> (:= ρ hγ) or ⊥ 
+  
+  ;; trivial recursion is an error
+  ;; NOTE -- could alternatively just drop ρ on the RHS  
+  [(solveR (:= ρ (simple-γ_1 ... ρ simple-γ_2 ...)))
    ⊥]
+  
+  ;; FIXME -- this rule isn't in Andreas' PDF
+  ;; trivial recursion is an error through * as well
+  [(solveR (:= ρ (simple-γ_1 ... (ρ *) simple-γ_2 ...)))
+   ⊥]
+  
+  ;; importing everything just copies the body
   [(solveR (:= ρ (dot (module ρ_1) *)))
-   (:= ρ ρ_1)]
+   (:= ρ [ρ_1])]
+  
+  ;; importing from a non-module name is an error
   [(solveR (:= ρ (dot V *)))
    ⊥]
+  
+  ;; restricting to * is not a restriction
   [(solveR (:= ρ (restrict γ *)))
    (:= ρ γ)]
-  [(solveR (:= ρ (restrict (simple-γ ...) (x ...))))
-   (:= ρ (simple-γ ...))
+  ;; we can only discharge a restriction when we have all concrete names
+  [(solveR (:= ρ (restrict (base-γ ...) (x ...))))
+   (:= ρ (base-γ ...))
    (side-condition (set=? (apply set (term (x ...)))
-                          (apply set (term (names-of (simple-γ ...))))))]
-  [(solveR (:= ρ (restrict (simple-γ ...) (x ...))))
+                          (apply set (term (names-of (base-γ ...))))))]
+  
+  ;; trying to restrict a name that isn't available is an error
+  [(solveR (:= ρ (restrict (base-γ ...) (x ...))))
    ⊥
-   (side-condition (proper-subset? (apply set (term (names-of (simple-γ ...))))
+   (side-condition (proper-subset? (apply set (term (names-of (base-γ ...))))
                                    (apply set (term (x ...)))))]
-  [(solveR (:= ρ (restrict (γ_1 ... (: x σ) γ ...) (x_1 ...))))
-   (:= ρ (restrict (γ_1 ... γ ...) (x_1 ...)))
+  
+  ;; discard constraints on names that are restricted
+  ;; FIXME -- what if there's a conflict that gets discarded?  can that happen?
+  [(solveR (:= ρ (restrict (simple-γ_1 ... (: x σ) simple-γ ...) (x_1 ...))))
+   (:= ρ (restrict (simple-γ_1 ... simple-γ ...) (x_1 ...)))
    (side-condition (not (set-member? (apply set (term (x_1 ...)))
                                      (term x))))]
-  [(solveR (:= ρ (restrict (γ_1 ... ((: x σ) *) γ ...) (x_1 ...))))
-   (:= ρ (restrict (γ_1 ... γ ...) (x_1 ...)))
+  [(solveR (:= ρ (restrict (simple-γ_1 ... ((: x σ) *) simple-γ ...) (x_1 ...))))
+   (:= ρ (restrict (simple-γ_1 ... simple-γ ...) (x_1 ...)))
    (side-condition (not (set-member? (apply set (term (x_1 ...)))
                                      (term x))))]
-  [(solveR (:= ρ (⊔ γ)))
-   (:= ρ γ)]
-  [(solveR (:= ρ (⊔ γ_1 ... () γ_2 ...)))
-   (:= ρ (⊔ γ_1 ... γ_2 ...))]
   
-  [(solveR (:= ρ (⊔ simple-γ_1 ...)))
-   (:= ρ (simple-γ_1 ...))]
-  
-  [(solveR (:= ρ (⊔ ((: x σ_1) γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...)))
+  ;; duplicate constaints on x is an error
+  ;; NOTE -- could allow this when σ_1 = σ_2
+  [(solveR (:= ρ (simple-γ_0 ... (: x σ_1) simple-γ_1 ... (: x σ_2) simple-γ_2 ...)))
    ⊥]
-  [(solveR (:= ρ (⊔ (((: x σ_1) *) γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...)))
-   (:= ρ (⊔ (γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...))]
+  ;; drop * constraints on x when there is a non-star binding for x
+  [(solveR (:= ρ (simple-γ_0 ... ((: x σ_1) *) simple-γ_1 ... (: x σ_2) simple-γ_2 ...)))
+   (:= ρ (simple-γ_0 ... simple-γ_1 ... (: x σ_2) simple-γ_2 ...))]
+  [(solveR (:= ρ (simple-γ_0 ... (: x σ_1) simple-γ_1 ... ((: x σ_2) *) simple-γ_2 ...)))
+   (:= ρ (simple-γ_0 ... simple-γ_1 ... (: x σ_2) simple-γ_2 ...))]
   
-  [(solveR (:= ρ (⊔ ((: x σ_1) γ_1 ...) (simple-γ_2 ...) γ_3 ...)))
-   (:= ρ (⊔ (γ_1 ...) ((: x σ_1) simple-γ_2 ...) γ_3 ...))
-   (side-condition (not (set-member? (apply set (term (names-of (simple-γ_2 ...))))
-                                     (term x))))]
-  [(solveR (:= ρ (⊔ (((: x σ_1) *) γ_1 ...) (simple-γ_2 ...) γ_3 ...)))
-   (:= ρ (⊔ (γ_1 ...) (((: x σ_1) *) simple-γ_2 ...) γ_3 ...))
-   (side-condition (not (set-member? (apply set (term (plain-names-of (simple-γ_2 ...))))
-                                     (term x))))]
+  ;; otherwise, we're done
   [(solveR C) C])
 
 (define-metafunction jsc
@@ -358,11 +370,16 @@
   [(substA α any_1 (any_2 ...)) ((substA α any_1 any_2) ...)]
   [(substA α any_1 any_2) any_2])
 
+;; rows have to be re-normalized, so this is harder
 (define-metafunction jsc
   substR : ρ any any -> any
   [(substR ρ any_r (:= any_1 any_2))
    (:= any_1 (substR ρ any_r any_2))]
   [(substR ρ any_1 ρ) any_1]
+  
+  [(substR ρ any_1 (simple-γ ...))
+   (⊔ (substR ρ any_1 simple-γ) ...)]
+  
   [(substR ρ any_1 (any_2 ...)) ((substR ρ any_1 any_2) ...)]
   [(substR ρ any_1 any_2) any_2])
 
