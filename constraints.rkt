@@ -15,8 +15,8 @@
   [α (A variable-not-otherwise-mentioned)]
   [ρ (R variable-not-otherwise-mentioned)]
   
-  [σ α V (module ρ)]
-  [final-σ V (module ρ)]
+  [σ α V (module [ρ])]
+  [final-σ V (module γ)]
   
   [pre-γ γ simple-γ (pre-γ *) (pre-γ ...)] ;; normalized to γ
   
@@ -40,8 +40,7 @@
 (define-extended-language jsc js
   [σ .... (module γ)]
   [hσ .... (check Γ x) (check* Γ x)]
-  [final-σ .... (module γ)]
-  [simple-C C (:= α final-σ) (:= ρ γ)])
+  [simple-C (:= α final-σ) (:= ρ γ)])
 
 (define-metafunction jsc
   flatten : pre-γ -> γ
@@ -106,17 +105,6 @@
    ---
    (typ/e Γ (+ e_1 e_2) V (norm-C (C_1 ... C_2 ...)))])
 
-
-(judgment-holds (typ/e () (+ 3 4) σ_1 Cs_1) (σ_1 Cs_1))
-(judgment-holds (typ/e () (dot z w) σ_1 Cs_1) (σ_1 Cs_1))
-
-(judgment-holds (typ/e () (+ y (dot z w)) σ_1 Cs_1) (σ_1 Cs_1))
-
-
-(define-metafunction jsc
-  ⊔ : γ ... -> γ
-  [(⊔ γ ...) (flatten (γ ...))])
-
 (define-judgment-form js
   #:mode (typ/m I I O O)
   #:contract (typ/m Γ m σ Cs)
@@ -135,8 +123,8 @@
    (where ρ_1 (fresh-ρ))
    (typ/d (γ_1 ... [ρ]) d γ_d (C_1 ...)) ...
    ---
-   (typ/m (γ_1 ...) (module d ...) (module ρ_1) 
-          (C_1 ... ...  (:= ρ (⊔ γ_d ...)) (:= ρ_1 (restrict [ρ] (exports d ...)))))])
+   (typ/m (γ_1 ...) (module d ...) (module [ρ_1]) 
+          (C_1 ... ...  (:= ρ (flatten (γ_d ...))) (:= ρ_1 (restrict [ρ] (exports d ...)))))])
 
 (define-metafunction js
   exports : d ... -> export-ids
@@ -321,9 +309,9 @@
   [(solveR (:= ρ (simple-γ_1 ... (ρ *) simple-γ_2 ...)))
    ⊥]
   
-  ;; importing everything just copies the body
-  [(solveR (:= ρ (dot (module ρ_1) *)))
-   (:= ρ [ρ_1])]
+  ;; importing everything just copies the body  
+  [(solveR (:= ρ (dot (module γ) *)))
+   (:= ρ γ)]
   
   ;; importing from a non-module name is an error
   [(solveR (:= ρ (dot V *)))
@@ -395,8 +383,7 @@
   [(subst (:= α final-σ) any)
    (substA α final-σ any)]
   [(subst (:= ρ γ) any)
-   (substR ρ γ any)]
-  [(subst C any) any])
+   (substR ρ γ any)])
 
 (define-metafunction jsc
   solve : C -> (C ...)
@@ -431,30 +418,20 @@
         (C_0 ... C ... C_1 ...)
         (where (C ...) (solve C_s))        
         (side-condition (not (equal? (term (C_s)) (term (C ...)))))
-        (side-condition (not (ormap (λ (e) (term (solvable? ,e)))
-                                    (term (C_0 ...)))))
+        (side-condition (not (ormap (λ (e) (term (solvable? ,e))) (term (C_0 ...)))))
         (computed-name (format "solve ~a" (term (cname C_s))))]   
    
    ;; substitute
    [--> (C_0 ... simple-C C_1 ...)
-        (C_2 ... simple-C C_3 ...)        
-        (where (C_2 ...) (subst simple-C (C_0 ...)))
-        (where (C_3 ...) (subst simple-C (C_1 ...)))                
-        ;; only do this if we can't simplify something first
-        (side-condition (not (ormap (λ (e) (term (solvable? ,e)))
-                                    (term (C_0 ... simple-C C_1 ...)))))
+        (C_2 ... simple-C C_3 ...)
+        ;; only do this if we can't simplify something first        
+        (side-condition (for/and ([t (term (C_0 ... simple-C C_1 ...))])
+                          (not (term (solvable? ,t)))))
         ;; make sure nothing else earlier is substable
-        ;; FIXME -- I'm doing something wrong here, but I don't know what it is
-        
-        (side-condition 
-         (if (ormap (λ (e) (and (term (substable? ,e (C_0 ... simple-C C_1 ...)))
-                                (printf "~a is substable when trying to subst ~a\n"
-                                        e (term simple-C))))
-                    (term (C_0 ...)))
-             (begin (printf "\n>>> failing because of the substable? condition at\n~a\n"
-                            (term (C_0 ... simple-C C_1 ...)))
-                    false)
-             true))
+        (side-condition (for/and ([t (term (C_0 ...))])
+                         (not (term (substable? ,t (C_0 ... simple-C C_1 ...))))))
+        (where (C_2 ...) (subst simple-C (C_0 ...)))
+        (where (C_3 ...) (subst simple-C (C_1 ...)))
         ;; don't substitute if it doesn't make progress
         (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
         (computed-name (format "subst ~a" (term (cname simple-C))))]))
@@ -465,24 +442,12 @@
 (define (go cs)
   (traces solver cs))
 
-(define d 
-  '((:= (R ρ1456) (⊔ () (: X V) (: Y V)))
-    (:= (R ρ1457) (restrict (R ρ1456) (X)))
-    (:= (A α1459) (module (R ρ1457)))
-    (:= (A α1460) (((R ρ1453)) x))
-    (:= (R ρ1461) (dot (A α1460) *))
-    (:= (R ρ1453) (⊔ (: x (A α1459)) ((R ρ1461) *)))
-    (:= (R ρ1454) (restrict (R ρ1453) ()))))
 
-#;
+(judgment-holds (typ/e () (+ 3 4) σ_1 Cs_1) (σ_1 Cs_1))
+(judgment-holds (typ/e () (dot z w) σ_1 Cs_1) (σ_1 Cs_1))
+
+(judgment-holds (typ/e () (+ y (dot z w)) σ_1 Cs_1) (σ_1 Cs_1))
+
 (go (constraints-of (mod x (module (export X) (let X 1) (let Y 2)))     
                     (import x *)))
 
-(define fail 
-  '((:= (R ρ29966) ((: X V) (: Y V)))
-    (:= (R ρ29967) ((: X V)))
-    (:= (A α29969) (module ((: X V))))
-    (:= (A α29970) (((R ρ29963)) x))
-    (:= (R ρ29971) (dot (A α29970) *))
-    (:= (R ρ29963) (⊔ (: x (module ((: X V)))) ((R ρ29971) *)))
-    (:= (R ρ29964) (restrict (R ρ29963) ()))))
