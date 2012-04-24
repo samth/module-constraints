@@ -184,13 +184,6 @@
 (define-syntax-rule (gen d ...)
   (judgment-holds (typ (module d ...) σ_1 Cs_1) (σ_1 Cs_1)))
 
-(gen (let x 1))
-
-(gen (import x *))
-
-(gen (mod x (module (export X) (let X 1) (let Y 2)))     
-     (import x *))
-
 (define-syntax-rule (constraints-of d ...)
   (match-let ([(list (list sig con-set)) (judgment-holds (typ (module d ...) σ_1 Cs_1) (σ_1 Cs_1))])
     con-set))
@@ -453,19 +446,21 @@
   [(final-state (solved-C ...)) #t]
   [(final-state (C ...)) #f])
 
+(module+ test
+  (judgment-holds (typ/e () (+ 3 4) σ_1 Cs_1) (σ_1 Cs_1))
+  (judgment-holds (typ/e () (dot z w) σ_1 Cs_1) (σ_1 Cs_1))
+  
+  (judgment-holds (typ/e () (+ y (dot z w)) σ_1 Cs_1) (σ_1 Cs_1))
+  (gen (let x 1))
+  
+  (gen (import x *))
+  
+  (gen (mod x (module (export X) (let X 1) (let Y 2)))     
+       (import x *)))
 
-(judgment-holds (typ/e () (+ 3 4) σ_1 Cs_1) (σ_1 Cs_1))
-(judgment-holds (typ/e () (dot z w) σ_1 Cs_1) (σ_1 Cs_1))
+(define-syntax-rule (run d ...)
+  (go (constraints-of d ...)))
 
-(judgment-holds (typ/e () (+ y (dot z w)) σ_1 Cs_1) (σ_1 Cs_1))
+(run (mod x (module (export X) (let X 1) (let Y 2)))     
+     (import x *))
 
-(go (constraints-of (mod x (module (export X) (let X 1) (let Y 2)))     
-                    (import x *)))
-
-(define end '((:= (R ρ206875) ((: X V) (: Y V)))
-              (:= (R ρ206876) ((: X V)))
-              (:= (A α206877) (module ((: X V))))
-              (:= (A α206878) (module ((: X V))))
-              (:= (R ρ206879) ((: X V)))
-              (:= (R ρ206873) ((: x (module ((: X V)))) ((: X V) *)))
-              (:= (R ρ206874) ())))
