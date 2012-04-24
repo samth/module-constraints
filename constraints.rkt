@@ -83,7 +83,7 @@
   
   [(where α (fresh-α))
    ---
-   (typ/e Γ x α ((:= α (Γ x))))]
+   (typ/e Γ x α ((:= α (select Γ x))))]
   
   [(typ/e Γ e σ (C ...))
    (where α (fresh-α))
@@ -99,6 +99,7 @@
 
 
 (judgment-holds (typ/e () (+ 3 4) σ_1 Cs_1) (σ_1 Cs_1))
+(judgment-holds (typ/e () (dot z w) σ_1 Cs_1) (σ_1 Cs_1))
 
 (judgment-holds (typ/e () (+ y (dot z w)) σ_1 Cs_1) (σ_1 Cs_1))
 
