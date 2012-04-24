@@ -12,25 +12,48 @@
   [x variable-not-otherwise-mentioned]
   [program (d ...)]
   ;; section 2
-  [σ α V (module ρ)]
-  [final-σ V (module ρ)]
   [α (A variable-not-otherwise-mentioned)]
   [ρ (R variable-not-otherwise-mentioned)]
-  [final-γ simple-γ (simple-γ ...)]
-  [γ ρ (: x σ) (γ ...) (γ *)] ;; multisequences to avoid associativity, · with ()
-  [simple-γ (: x σ) ((: x σ) *)]
+  
+  [σ α V (module ρ)]
+  [final-σ V (module ρ)]
+  
+  [γ (simple-γ ...)] ;; multisequences to avoid associativity, · with ()
+  [simple-γ (: x σ) ((: x σ) *) ρ (ρ *)]
+  [pre-γ γ simple-γ (pre-γ *) (pre-γ ...)] ;; normalized to γ
+  
   [Γ (γ ...)]
+  
   [hσ σ (Γ x) (dot σ x)]
-  [hγ γ (restrict γ export-ids) (⊔ γ ...) (dot σ *)]
-  [C bot (:= α hσ) (:= ρ hγ)] ;; represent concatenation with Cs, ⊤ with ()
+  [hγ γ (restrict γ export-ids) (dot σ *)]
+  [C ⊥ (:= α hσ) (:= ρ hγ)] ;; represent concatenation with Cs, ⊤ with ()
   [Cs (C ...)]  
+  
   [export-ids (x ...) *]
   )
 
+(define-metafunction js
+  flatten : pre-γ -> γ
+  [(flatten simple-γ) (simple-γ)]
+  [(flatten (pre-γ ...))
+   (simple-γ ... ...)
+   (where ((simple-γ ...) ...) ((flatten pre-γ) ...))]
+  [(flatten (pre-γ *))
+   ((add-* simple-γ) ...)
+   (where (simple-γ ...) (flatten pre-γ))])
+
+(define-metafunction js
+  add-* : simple-γ -> simple-γ
+  [(add-* (simple-γ *)) (simple-γ *)]
+  [(add-* simple-γ) (simple-γ *)])
+
+;; totality checking
+(module+ testX
+  (redex-check js pre-γ_1 (term (flatten pre-γ_1))))
+
 ;; implicit equivalences
 (define-metafunction js
-  norm-γ : γ -> γ
-  [(norm-γ (γ_1 ... γ_2 ...)) (norm-γ (γ_1 ... γ_2 ...))]
+  norm-γ : pre-γ -> γ
   [(norm-γ ((γ ...) *)) (norm-γ ((γ *) ...))]
   [(norm-γ ((γ *) *)) (norm-γ (γ *))]
   [(norm-γ (γ ...)) ((norm-γ γ) ...)]
@@ -39,7 +62,7 @@
 
 (define-metafunction js
   norm-C : Cs -> Cs  
-  [(norm-C (C_1 ... bot C_2 ...)) bot]
+  [(norm-C (C_1 ... ⊥ C_2 ...)) (⊥)]
   [(norm-C Cs) Cs])
 
 ;; typing rules
@@ -78,6 +101,10 @@
 (judgment-holds (typ/e () (+ y (dot z w)) σ_1 Cs_1) (σ_1 Cs_1))
 
 
+(define-metafunction js
+  ⊔ : γ ... -> γ
+  [(⊔ γ ...) (flatten (γ ...))])
+
 (define-judgment-form js
   #:mode (typ/m I I O O)
   #:contract (typ/m Γ m σ Cs)
@@ -94,12 +121,10 @@
   
   [(where ρ   (fresh-ρ))
    (where ρ_1 (fresh-ρ))
-   (where ρ_2 (fresh-ρ))
-   (typ/d (γ_1 ... ρ) d γ_d (C_1 ...)) ...
-   (where (C_new ...) (C_1 ... ...  (:= ρ (⊔ γ_d ...)) (:= ρ_1 (restrict ρ (exports d ...)))))
-   ;(where γ )
+   (typ/d (γ_1 ... [ρ]) d γ_d (C_1 ...)) ...
    ---
-   (typ/m (γ_1 ...) (module d ...) (module ρ_1) (C_new ...))])
+   (typ/m (γ_1 ...) (module d ...) (module ρ_1) 
+          (C_1 ... ...  (:= ρ (⊔ γ_d ...)) (:= ρ_1 (restrict [ρ] (exports d ...)))))])
 
 (define-metafunction js
   exports : d ... -> export-ids
@@ -125,23 +150,23 @@
   
   [(typ/e Γ e σ Cs)
    ---
-   (typ/d Γ (let x e) (: x V) Cs)]
+   (typ/d Γ (let x e) [(: x V)] Cs)]
   
   [(typ/m Γ m σ (C ...))
    (where α (fresh-α))
    ---
-   (typ/d Γ (mod x m) (: x α) (C ... (:= α σ)))]
+   (typ/d Γ (mod x m) [(: x α)] (C ... (:= α σ)))]
   
   [(typ/m Γ m σ (C ...))
    (where α (fresh-α))
    (where ρ (fresh-ρ))
    ---
-   (typ/d Γ (import m x) (: x α) (C ... (:= α (dot σ x)) (:= ρ (dot σ *))))]
+   (typ/d Γ (import m x) [(: x α)] (C ... (:= α (dot σ x)) (:= ρ (dot σ *))))]
   
   [(typ/m Γ m σ (C ...))   
    (where ρ (fresh-ρ))
    ---
-   (typ/d Γ (import m *) (ρ *) (C ... (:= ρ (dot σ *))))]
+   (typ/d Γ (import m *) [(ρ *)] (C ... (:= ρ (dot σ *))))]
   )
 
 (define-judgment-form js
@@ -174,13 +199,13 @@
 
 ;; constraints on signatures
 (define-metafunction jsc
-  solveA : (:= α hσ) -> (:= α hσ) or bot
+  solveA : (:= α hσ) -> (:= α hσ) or ⊥
   [(solveA (:= α ((γ ... (γ_1 ... (: x σ))) x)))
    (:= α σ)]
   [(solveA (:= α ((γ ... (((: x σ) *))) x)))
    (:= α σ)]
   [(solveA (:= α ((γ ... (γ_1 ... ((: x σ_1) *) ((: x σ) *))) x)))
-   bot] ;; could allow this if σ = σ_1
+   ⊥] ;; could allow this if σ = σ_1
   [(solveA (:= α ((γ ... (γ_1 ... (: x_1 σ))) x)))
    (:= α ((γ ... (γ_1 ...)) x))
    (side-condition (not (equal? (term x) (term x_1))))]
@@ -190,13 +215,13 @@
   [(solveA (:= α ((γ ... ()) x))) 
    (:= α ((γ ...) x))]
   [(solveA (:= α (() x))) 
-   bot]
+   ⊥]
   [(solveA (:= α (dot (module ρ) x)))
    (:= α ((ρ) x))]
   [(solveA (:= α (dot V x)))
    (:= α V)]
   [(solveA (:= α α))
-   bot]
+   ⊥]
   [(solveA C) C])
 
 (define-metafunction jsc
@@ -229,13 +254,13 @@
   [(plain-names-of ()) ()])
 
 (define-metafunction jsc 
-  solveR : (:= ρ hγ) -> (:= ρ hγ) or bot  
+  solveR : (:= ρ hγ) -> (:= ρ hγ) or ⊥  
   [(solveR (:= ρ (γ_1 ... ρ γ_2 ...)))
-   bot]
+   ⊥]
   [(solveR (:= ρ (dot (module ρ_1) *)))
    (:= ρ ρ_1)]
   [(solveR (:= ρ (dot V *)))
-   bot]
+   ⊥]
   [(solveR (:= ρ (restrict γ *)))
    (:= ρ γ)]
   [(solveR (:= ρ (restrict (simple-γ ...) (x ...))))
@@ -243,7 +268,7 @@
    (side-condition (set=? (apply set (term (x ...)))
                           (apply set (term (names-of (simple-γ ...))))))]
   [(solveR (:= ρ (restrict (simple-γ ...) (x ...))))
-   bot
+   ⊥
    (side-condition (proper-subset? (apply set (term (names-of (simple-γ ...))))
                                    (apply set (term (x ...)))))]
   [(solveR (:= ρ (restrict (γ_1 ... (: x σ) γ ...) (x_1 ...))))
@@ -263,7 +288,7 @@
    (:= ρ (simple-γ_1 ...))]
   
   [(solveR (:= ρ (⊔ ((: x σ_1) γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...)))
-   bot]
+   ⊥]
   [(solveR (:= ρ (⊔ (((: x σ_1) *) γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...)))
    (:= ρ (⊔ (γ_1 ...) ((: x σ_2) γ_2 ...) γ_3 ...))]
   
@@ -297,7 +322,7 @@
   (reduction-relation 
    jsc
    #:domain Cs
-   [--> (C_0 ... bot C_1 ....) (bot) bot]
+   [--> (C_0 ... ⊥ C_1 ....) (⊥) ⊥]
    [--> (C_0 ... (:= α hσ) C_1 ...)
         (C_0 ... C C_1 ...)
         (where C (solveA (:= α hσ)))
@@ -340,28 +365,15 @@
     (:= (R ρ1453) (⊔ (: x (A α1459)) ((R ρ1461) *)))
     (:= (R ρ1454) (restrict (R ρ1453) ()))))
 
-
+#;
 (go (constraints-of (mod x (module (export X) (let X 1) (let Y 2)))     
                     (import x *)))
 
-(define fail '((:=
-                (R ρ29966)
-                ((: X V) (: Y V)))
-               (:= (R ρ29967) ((: X V)))
-               (:=
-                (A α29969)
-                (module ((: X V))))
-               (:=
-                (A α29970)
-                (((R ρ29963)) x))
-               (:=
-                (R ρ29971)
-                (dot (A α29970) *))
-               (:=
-                (R ρ29963)
-                (⊔
-                 (: x (module ((: X V))))
-                 ((R ρ29971) *)))
-               (:=
-                (R ρ29964)
-                (restrict (R ρ29963) ()))))
+(define fail 
+  '((:= (R ρ29966) ((: X V) (: Y V)))
+    (:= (R ρ29967) ((: X V)))
+    (:= (A α29969) (module ((: X V))))
+    (:= (A α29970) (((R ρ29963)) x))
+    (:= (R ρ29971) (dot (A α29970) *))
+    (:= (R ρ29963) (⊔ (: x (module ((: X V)))) ((R ρ29971) *)))
+    (:= (R ρ29964) (restrict (R ρ29963) ()))))
