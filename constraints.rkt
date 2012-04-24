@@ -40,7 +40,11 @@
 (define-extended-language jsc js
   [σ .... (module γ)]
   [hσ .... (check Γ x) (check* Γ x)]
-  [simple-C (:= α final-σ) (:= ρ γ)])
+  [simple-C (:= α final-σ) (:= ρ γ)]
+  [solved-C (:= α solved-σ) (:= ρ solved-γ)]
+  [solved-σ V (module solved-γ)]
+  [solved-γ (solved-base-γ ...)]
+  [solved-base-γ (: x solved-σ) ((: x solved-σ) *)])
 
 (define-metafunction jsc
   flatten : pre-γ -> γ
@@ -440,7 +444,14 @@
 (lazy-require [redex (traces)])
 
 (define (go cs)
-  (traces solver cs))
+  (traces solver cs #:pred (λ (e) (if (term (final-state ,e))
+                                      "green"
+                                      #true))))
+
+(define-metafunction jsc
+  final-state : (C ...) -> #t or #f
+  [(final-state (solved-C ...)) #t]
+  [(final-state (C ...)) #f])
 
 
 (judgment-holds (typ/e () (+ 3 4) σ_1 Cs_1) (σ_1 Cs_1))
@@ -451,3 +462,10 @@
 (go (constraints-of (mod x (module (export X) (let X 1) (let Y 2)))     
                     (import x *)))
 
+(define end '((:= (R ρ206875) ((: X V) (: Y V)))
+              (:= (R ρ206876) ((: X V)))
+              (:= (A α206877) (module ((: X V))))
+              (:= (A α206878) (module ((: X V))))
+              (:= (R ρ206879) ((: X V)))
+              (:= (R ρ206873) ((: x (module ((: X V)))) ((: X V) *)))
+              (:= (R ρ206874) ())))
