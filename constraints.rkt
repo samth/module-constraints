@@ -405,15 +405,15 @@
   [(cname (:= (R x) hγ)) x])
 
 (define-metafunction jsc
-  solvable? : C -> any
+  solvable? : C -> #t or #f
   [(solvable? C) ,(not (equal? (term (C)) (term (solve C))))])
 
 (define-metafunction jsc
-  substable? : C (C ...) -> any
+  substable? : C (C ...) -> #t or #f
   [(substable? simple-C (C ...))
    ,(not (equal? (term (C ...))
                  (term (subst simple-C (C ...)))))]
-  [(substable? C any) false])
+  [(substable? C any) #f])
 
 (define solver
   (reduction-relation 
@@ -439,13 +439,14 @@
         ;; only do this if we can't simplify something first
         (side-condition (not (ormap (λ (e) (term (solvable? ,e)))
                                     (term (C_0 ... simple-C C_1 ...)))))
-        ;; make sure nothing else earlier is substable
+        ;; make sure nothing else earlier is substable        
         #;
-        (side-condition (not (ormap (λ (e) (term (substable? ,e (C_0 ... C_1 ...))))
+        (side-condition (not (ormap (λ (e) (and (term (substable? ,e (C_0 ... simple-C C_1 ...)))
+                                                (printf "~a is substable\n" e)))
                                     (term (C_0 ...)))))
         ;; don't substitute if it doesn't make progress
         (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
-        (computed-name (format "subst ~a" (term simple-C)))]))
+        (computed-name (format "subst ~a" (term (cname simple-C))))]))
 
 (require unstable/lazy-require)
 (lazy-require [redex (traces)])
