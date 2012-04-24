@@ -41,7 +41,7 @@
   [σ .... (module γ)]
   [hσ .... (check Γ x) (check* Γ x)]
   [final-σ .... (module γ)]
-  [simple-C (:= α final-σ) (:= ρ γ)])
+  [simple-C C (:= α final-σ) (:= ρ γ)])
 
 (define-metafunction jsc
   flatten : pre-γ -> γ
@@ -392,7 +392,8 @@
   [(subst (:= α final-σ) any)
    (substA α final-σ any)]
   [(subst (:= ρ γ) any)
-   (substR ρ γ any)])
+   (substR ρ γ any)]
+  [(subst C any) any])
 
 (define-metafunction jsc
   solve : C -> (C ...)
@@ -439,11 +440,18 @@
         ;; only do this if we can't simplify something first
         (side-condition (not (ormap (λ (e) (term (solvable? ,e)))
                                     (term (C_0 ... simple-C C_1 ...)))))
-        ;; make sure nothing else earlier is substable        
-        #;
-        (side-condition (not (ormap (λ (e) (and (term (substable? ,e (C_0 ... simple-C C_1 ...)))
-                                                (printf "~a is substable\n" e)))
-                                    (term (C_0 ...)))))
+        ;; make sure nothing else earlier is substable
+        ;; FIXME -- I'm doing something wrong here, but I don't know what it is
+        
+        (side-condition 
+         (if (ormap (λ (e) (and (term (substable? ,e (C_0 ... simple-C C_1 ...)))
+                                (printf "~a is substable when trying to subst ~a\n"
+                                        e (term simple-C))))
+                    (term (C_0 ...)))
+             (begin (printf "\n>>> failing because of the substable? condition at\n~a\n"
+                            (term (C_0 ... simple-C C_1 ...)))
+                    false)
+             true))
         ;; don't substitute if it doesn't make progress
         (side-condition (not (equal? (term (C_0 ... C_1 ...)) (term (C_2 ... C_3 ...)))))
         (computed-name (format "subst ~a" (term (cname simple-C))))]))
