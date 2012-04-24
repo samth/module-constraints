@@ -238,7 +238,10 @@
   ;; possibly-unresolved rows, add a check
   [(solveA (:= α (select (γ ... (simple-γ_1 ... ((: x σ) *) simple-γ_2 ...)) x)))
    ((:= α σ)
-    (:= α (check* (γ ... (simple-γ_1 ... ((: x σ) *) simple-γ_2 ...)) x)))]
+    (:= α (check* (γ ... (simple-γ_1 ... ((: x σ) *) simple-γ_2 ...)) x)))
+   ;; can't select an x that's starred if anything else might become an unstarred x
+   (side-condition (for/and ([t (term (simple-γ_1 ... simple-γ_2 ...))])
+                       (not (redex-match jsc ρ t))))]
   
   ;; done with this and it failed b/c of duplicate *
   [(solveA (:= α (check* (γ ... (simple-γ_1 ... ((: x σ_1) *) simple-γ_2 ... ((: x σ) *) simple-γ_3 ...)) x)))
