@@ -3,6 +3,8 @@
 
 (caching-enabled? #f)
 
+(define-syntax-rule (module+ _ ...) (begin))
+
 (define-language js
   ;; section 1 of andreas' pdf
   [e x (dot e x) n (+ e e)]
