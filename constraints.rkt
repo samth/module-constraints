@@ -283,6 +283,14 @@
   [(names-of ()) ()])
 
 (define-metafunction jsc
+  name-in : (simple-γ ...) x -> #t or #f
+  [(name-in ((: x σ) simple-γ ...) x) #t]
+  [(name-in (((: x σ) *) simple-γ ...) x) #t]
+  [(name-in () x) #f]
+  [(name-in (simple-γ simple-γ_1 ...) x)
+   (name-in (simple-γ_1 ...) x)])
+
+(define-metafunction jsc
   plain-names-of : (base-γ ...) -> (x ...)
   [(plain-names-of ((: x σ) base-γ ...))
    (x_1 ... x_2 ...)
@@ -334,11 +342,13 @@
   ;; discard constraints on names that are restricted
   ;; FIXME -- what if there's a conflict that gets discarded?  can that happen?
   [(solveR (:= ρ (restrict (simple-γ_1 ... (: x σ) simple-γ ...) (x_1 ...))))
-   (:= ρ (restrict (simple-γ_1 ... simple-γ ...) (x_1 ...)))
+   (solveR (:= ρ (restrict (simple-γ_1 ... simple-γ ...) (x_1 ...))))
+   (side-condition (not (term (name-in (simple-γ_1 ...) x))))
    (side-condition (not (set-member? (apply set (term (x_1 ...)))
                                      (term x))))]
   [(solveR (:= ρ (restrict (simple-γ_1 ... ((: x σ) *) simple-γ ...) (x_1 ...))))
    (:= ρ (restrict (simple-γ_1 ... simple-γ ...) (x_1 ...)))
+   (side-condition (not (term (name-in (simple-γ_1 ...) x))))
    (side-condition (not (set-member? (apply set (term (x_1 ...)))
                                      (term x))))]
   
@@ -462,7 +472,29 @@
 
 (define-syntax-rule (run d ...)
   (go (constraints-of d ...)))
-
+#;#;
 (run (mod x (module (export X) (let X 1) (let Y 2)))     
      (import x *))
+
+(run 
+ (mod y (module (export X) (let X 1)))
+ (mod x (module (export X) (import y *) (let Y 2)))
+ (import x *))
+
+(define stuck2
+  '((:= (R ρ68) ((: X V)))
+    (:= (R ρ69) ((: X V)))
+    (:= (A α70) (module ((: X V))))
+    (:=
+     (A α73)
+     (select (((: y (module ((: X V)))) (: x (module ((R ρ72)))) ((R ρ72) *)) (((R ρ74) *) (: Y V))) y))
+    (:= (R ρ74) (dot (A α73) *))
+    (:= (R ρ71) (((R ρ74) *) (: Y V)))
+    (:= (R ρ72) (restrict (((R ρ74) *)) (X)))
+    (:= (A α75) (module ((R ρ72))))
+    (:= (A α76) (module ((R ρ72))))
+    (:= (A α76) (check (((: y (module ((: X V)))) (: x (module ((R ρ72)))) ((R ρ72) *))) x))
+    (:= (R ρ77) ((R ρ72)))
+    (:= (R ρ66) ((: y (module ((: X V)))) (: x (module ((R ρ72)))) ((R ρ72) *)))
+    (:= (R ρ67) (restrict (((R ρ72) *)) ()))))
 
